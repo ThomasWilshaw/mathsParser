@@ -14,6 +14,7 @@ public:
         kNum,
         kLParen,
         kRParen,
+        kPow,
         kEnd,
         kUnknown
     };
@@ -101,7 +102,11 @@ public:
       } else if (std::regex_match(input_, std::regex(R"(^\).*)"))) {
           token->SetType(Token::Type::kRParen);
           input_.erase(0, 1);
-      } else if (input_.empty()) {
+      } else if (std::regex_match(input_, std::regex(R"(^\^.*)"))) {
+          token->SetType(Token::Type::kPow);
+          input_.erase(0, 1);
+      }
+      else if (input_.empty()) {
           token->SetType(Token::Type::kEnd);
       }
 
@@ -228,14 +233,17 @@ private:
       lexer_.GetNextToken(current_token_);
       Token::Type current_type = current_token_->GetType();
 
-      while (current_type == Token::Type::kMult || current_type == Token::Type::kDiv) {
+      while (current_type == Token::Type::kMult || current_type == Token::Type::kDiv || current_type == Token::Type::kPow) {
           double factor2 = number();
 
           if (current_type == Token::Type::kMult) {
               factor1 *= factor2;
           }
-          else {
+          else if(current_type == Token::Type::kDiv) {
               factor1 /= factor2;
+          }
+          else {
+              factor1 = pow(factor1, factor2);
           }
 
           lexer_.GetNextToken(current_token_);
@@ -287,7 +295,7 @@ int main()
 {
     std::cout << "Hello World!\n";
     
-    Parser p("5+(3*(5+4)-1.5)");
+    Parser p("(5-3)^-(2+2)");
     p.parse();
     if (!p.error()) {
         std::cout << p.GetValue();
