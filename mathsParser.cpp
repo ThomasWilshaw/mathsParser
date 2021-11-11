@@ -11,10 +11,10 @@ public:
         kMinus,
         kMult,
         kDiv,
+        kPow,
         kNum,
         kLParen,
         kRParen,
-        kPow,
         kEnd,
         kUnknown
     };
@@ -90,6 +90,9 @@ public:
       }else if (std::regex_match(input_, std::regex(R"(^\/.*)"))) {
           token->SetType(Token::Type::kDiv);
           input_.erase(0, 1);
+      } else if (std::regex_match(input_, std::regex(R"(^\^.*)"))) {
+          token->SetType(Token::Type::kPow);
+          input_.erase(0, 1);
       } else if (std::regex_match(input_, std::regex(R"(^\d+\.?\d*.*)"))) {
           token->SetType(Token::Type::kNum);
           std::smatch m;
@@ -102,11 +105,7 @@ public:
       } else if (std::regex_match(input_, std::regex(R"(^\).*)"))) {
           token->SetType(Token::Type::kRParen);
           input_.erase(0, 1);
-      } else if (std::regex_match(input_, std::regex(R"(^\^.*)"))) {
-          token->SetType(Token::Type::kPow);
-          input_.erase(0, 1);
-      }
-      else if (input_.empty()) {
+      } else if (input_.empty()) {
           token->SetType(Token::Type::kEnd);
       }
 
@@ -141,7 +140,7 @@ public:
     /**
     * @brief A recursive parser for simple maths operations
     * 
-    * Supports +-/*()
+    * Supports ()^/*+-
     */
     Parser(std::string input):
         lexer_(input),
