@@ -1,294 +1,177 @@
 
-#include <iostream>
-#include <regex>
-#include <string>
+#include "mathsParser.h"
 
-class Token
+Lexer::Lexer(std::string input) :
+    input_(input),
+    get_previous_token_(false),
+    previous_token_()
 {
-public:
-    enum class Type {
-        kPlus,
-        kMinus,
-        kMult,
-        kDiv,
-        kPow,
-        kNum,
-        kLParen,
-        kRParen,
-        kEnd,
-        kUnknown
-    };
-    Token() :
-      type_(Type::kUnknown),
-      value_(0)
-    {
-    }
+}
 
-    Type GetType()
-    {
-      return type_;
-    }
-
-    void SetType(Token::Type type)
-    {
-      type_ = type;
-    }
-
-    double GetValue()
-    {
-      return value_;
-    }
-
-    void SetValue(double value)
-    {
-      value_ = value;
-    }
-
-private:
-    Type type_;
-    double value_;
-};
-
-class Lexer
+void Lexer::GetNextToken(Token* token)
 {
-public:
-    /**
-    * @brief Takes an input string and can generate the correct series of tokens
-    */
-    Lexer(std::string input) :
-        input_(input),
-        get_previous_token_(false),
-        previous_token_()
-    {
-    }
+  if (get_previous_token_) {
+    get_previous_token_ = false;
+    token->SetType(previous_token_.GetType());
+    token->SetValue(previous_token_.GetValue());
+    return;
+  }
+  token->SetType(Token::Type::kUnknown);
 
-    /**
-    * @brief Generates the next token from the input string
-    * 
-    * The input character that was turned into a token is also removed from the string
-    */
-    void GetNextToken(Token* token)
-    {
-      if (get_previous_token_) {
-        get_previous_token_ = false;
-        token->SetType(previous_token_.GetType());
-        token->SetValue(previous_token_.GetValue());
-        return;
-      }
-      token->SetType(Token::Type::kUnknown);
+  // Use QString to strip leading white spaces
+  if (std::regex_match(input_, std::regex(R"(^\+.*)"))) {
+    token->SetType(Token::Type::kPlus);
+    input_.erase(0, 1);
+  } else if (std::regex_match(input_, std::regex(R"(^\-.*)"))) {
+    token->SetType(Token::Type::kMinus);
+    input_.erase(0, 1);
+  } else if (std::regex_match(input_, std::regex(R"(^\*.*)"))) {
+    token->SetType(Token::Type::kMult);
+    input_.erase(0, 1);
+  }else if (std::regex_match(input_, std::regex(R"(^\/.*)"))) {
+    token->SetType(Token::Type::kDiv);
+    input_.erase(0, 1);
+  } else if (std::regex_match(input_, std::regex(R"(^\^.*)"))) {
+    token->SetType(Token::Type::kPow);
+    input_.erase(0, 1);
+  } else if (std::regex_match(input_, std::regex(R"(^\d+\.?\d*.*)"))) {
+    token->SetType(Token::Type::kNum);
+    std::smatch m;
+    std::regex_search(input_, m, std::regex(R"(^\d+\.?\d*.*)"));
+    token->SetValue(stod(m[0].str()));
+    input_ = std::regex_replace(input_, std::regex(R"(^\d+\.?\d*)"), "", std::regex_constants::format_first_only);
+  } else if (std::regex_match(input_, std::regex(R"(^\(.*)"))) {
+    token->SetType(Token::Type::kLParen);
+    input_.erase(0, 1);
+  } else if (std::regex_match(input_, std::regex(R"(^\).*)"))) {
+    token->SetType(Token::Type::kRParen);
+    input_.erase(0, 1);
+  } else if (input_.empty()) {
+    token->SetType(Token::Type::kEnd);
+  }
 
-      // Use QString to strip leading white spaces
-      if (std::regex_match(input_, std::regex(R"(^\+.*)"))) {
-          token->SetType(Token::Type::kPlus);
-          input_.erase(0, 1);
-      } else if (std::regex_match(input_, std::regex(R"(^\-.*)"))) {
-          token->SetType(Token::Type::kMinus);
-          input_.erase(0, 1);
-      } else if (std::regex_match(input_, std::regex(R"(^\*.*)"))) {
-          token->SetType(Token::Type::kMult);
-          input_.erase(0, 1);
-      }else if (std::regex_match(input_, std::regex(R"(^\/.*)"))) {
-          token->SetType(Token::Type::kDiv);
-          input_.erase(0, 1);
-      } else if (std::regex_match(input_, std::regex(R"(^\^.*)"))) {
-          token->SetType(Token::Type::kPow);
-          input_.erase(0, 1);
-      } else if (std::regex_match(input_, std::regex(R"(^\d+\.?\d*.*)"))) {
-          token->SetType(Token::Type::kNum);
-          std::smatch m;
-          std::regex_search(input_, m, std::regex(R"(^\d+\.?\d*.*)"));
-          token->SetValue(stod(m[0].str()));
-          input_ = std::regex_replace(input_, std::regex(R"(^\d+\.?\d*)"), "", std::regex_constants::format_first_only);
-      } else if (std::regex_match(input_, std::regex(R"(^\(.*)"))) {
-          token->SetType(Token::Type::kLParen);
-          input_.erase(0, 1);
-      } else if (std::regex_match(input_, std::regex(R"(^\).*)"))) {
-          token->SetType(Token::Type::kRParen);
-          input_.erase(0, 1);
-      } else if (input_.empty()) {
-          token->SetType(Token::Type::kEnd);
-      }
+  if (token->GetType() == Token::Type::kUnknown) {
+    input_ = ""; // Not ideal but forces computation to stop
+  }
 
-      if (token->GetType() == Token::Type::kUnknown) {
-          input_ = ""; // Not ideal but forces computation to stop
-      }
 
-      
-      // Saves this token in case we need to go backwards later
-      previous_token_.SetType(token->GetType());
-      previous_token_.SetValue(token->GetValue());
-    }
+  // Saves this token in case we need to go backwards later
+  previous_token_.SetType(token->GetType());
+  previous_token_.SetValue(token->GetValue());
+}
 
-    /**
-    * @brief Forces GenerateNextToken() to pull back the previously used token 
-    */
-    void revert()
-    {
-        get_previous_token_ = true;
-    }
-
-private:
-    std::string input_;
-    bool get_previous_token_;
-
-    Token previous_token_;
-};
-
-class Parser
+void Lexer::revert()
 {
-public:
-    /**
-    * @brief A recursive parser for simple maths operations
-    * 
-    * Supports ()^/*+-
-    */
-    Parser(std::string input):
+  get_previous_token_ = true;
+}
+
+
+
+Parser::Parser(std::string input):
         lexer_(input),
         original_input_(input),
         value_(0),
         error_(false)
-    {
-        current_token_ = new Token();
+{
+  current_token_ = new Token();
+}
+
+double Parser::GetValue() {
+  return value_;
+}
+
+void Parser::parse()
+{
+  double expression_value = expression();
+
+  lexer_.GetNextToken(current_token_);
+  if (current_token_->GetType() == Token::Type::kEnd && !error_) {
+    value_ = expression_value;
+  } else {
+    error_ = true;
+  }
+}
+
+double Parser::expression()
+{
+  double component1 = factor();
+
+  lexer_.GetNextToken(current_token_);
+  Token::Type current_type = current_token_->GetType();
+
+  while (current_type == Token::Type::kPlus || current_type == Token::Type::kMinus) {
+    double component2 = factor();
+
+    if (current_type == Token::Type::kPlus) {
+      component1 += component2;
+    } else {
+      component1 -= component2;
     }
 
+    lexer_.GetNextToken(current_token_);
+    current_type = current_token_->GetType();
+  }
 
-    /**
-    * @brief Returns the computed value
-    * 
-    * Check there were no errors with error() before using the value
-    */
-    double GetValue() {
-        return value_;
+  lexer_.revert();
+
+  return component1;
+}
+
+
+double Parser::factor()
+{
+  double factor1 = number();
+
+  lexer_.GetNextToken(current_token_);
+  Token::Type current_type = current_token_->GetType();
+
+  while (current_type == Token::Type::kMult || current_type == Token::Type::kDiv || current_type == Token::Type::kPow) {
+    double factor2 = number();
+
+    if (current_type == Token::Type::kMult) {
+      factor1 *= factor2;
+    } else if(current_type == Token::Type::kDiv) {
+      factor1 /= factor2;
+    } else {
+      factor1 = pow(factor1, factor2);
     }
 
-    /**
-    * @brief Returns true if any errors were encountered
-    */
-    bool error() { return error_; }
+    lexer_.GetNextToken(current_token_);
+    current_type = current_token_->GetType();
+  }
+  lexer_.revert();
 
-    /**
-    * @brief Returns the origional input
-    * 
-    * The Lexer eats the first character every time it generates a token
-    * and it may simetimes be necessary to get this input back if there 
-    * has been an error
-    */
-    std::string GetInputString() { return original_input_; }
+  return factor1;
+}
 
-    /**
-    * @brief Parses the functin and saves the result
-    * 
-    * If there are any errors it sets error_ to true
-    */
-    void parse()
-    {
-        double expression_value = expression();
+    
+double Parser::number()
+{
+  lexer_.GetNextToken(current_token_);
 
-        lexer_.GetNextToken(current_token_);
-        if (current_token_->GetType() == Token::Type::kEnd && !error_) {
-            value_ = expression_value;
-        }
-        else {
-            error_ = true;
-        }
+  Token::Type current_type = current_token_->GetType();
+  double value = 0;
+
+  if (current_type == Token::Type::kLParen) {
+    value = expression();
+
+    lexer_.GetNextToken(current_token_);
+    if (current_token_->GetType() != Token::Type::kRParen) {
+      error_ = true;
     }
+  } else if (current_type == Token::Type::kNum) {
+    value = current_token_->GetValue();
+  } else if(current_type == Token::Type::kMinus){
+    value = -1.0 * expression();
+  } else {
+    error_ = true;
+  }
+  
+  return value;
+}
 
-private:
-    /**
-    * @brief Recursively computes an expression
-    */
-    double expression()
-    {
-        double component1 = factor();
+    
 
-        lexer_.GetNextToken(current_token_);
-        Token::Type current_type = current_token_->GetType();
-
-        while (current_type == Token::Type::kPlus || current_type == Token::Type::kMinus) {
-            double component2 = factor();
-
-            if (current_type == Token::Type::kPlus) {
-                component1 += component2;
-            } else{
-                component1 -= component2;
-            }
-
-            lexer_.GetNextToken(current_token_);
-            current_type = current_token_->GetType();
-        }
-
-        lexer_.revert();
-
-        return component1;
-    }
-
-    /**
-    * @brief Recursively computes an factor
-    */
-    double factor()
-    {
-      double factor1 = number();
-
-      lexer_.GetNextToken(current_token_);
-      Token::Type current_type = current_token_->GetType();
-
-      while (current_type == Token::Type::kMult || current_type == Token::Type::kDiv || current_type == Token::Type::kPow) {
-          double factor2 = number();
-
-          if (current_type == Token::Type::kMult) {
-              factor1 *= factor2;
-          }
-          else if(current_type == Token::Type::kDiv) {
-              factor1 /= factor2;
-          }
-          else {
-              factor1 = pow(factor1, factor2);
-          }
-
-          lexer_.GetNextToken(current_token_);
-          current_type = current_token_->GetType();
-      }
-      lexer_.revert();
-
-      return factor1;
-    }
-
-    /**
-    * @brief Returns a number or ecursively computes an expression if
-    * brackets are found
-    */
-    double number()
-    {
-        lexer_.GetNextToken(current_token_);
-
-        Token::Type current_type = current_token_->GetType();
-        double value = 0;
-
-        if (current_type == Token::Type::kLParen) {
-            value = expression();
-
-            lexer_.GetNextToken(current_token_);
-            if (current_token_->GetType() != Token::Type::kRParen) {
-                error_ = true;
-            }
-        } else if (current_type == Token::Type::kNum) {
-                value = current_token_->GetValue();
-        }
-        else if(current_type == Token::Type::kMinus){
-            value = -1.0 * expression();
-        } else {
-            error_ = true;
-        }
-
-        return value;
-    }
-
-    Lexer lexer_;
-    Token* current_token_;
-    std::string original_input_;
-    double value_;
-    bool error_;
-};
 
 int main()
 {
